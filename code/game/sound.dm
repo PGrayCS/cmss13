@@ -20,21 +20,40 @@
 	var/y_s_offset // Vertical sound offset
 	var/x_s_offset // Horizontal sound offset
 
+
+/proc/areas_can_share_sound(area/first_area, area/second_area)
+	var/from_isolated = first_area ? !!first_area.sound_isolated : FALSE
+	var/to_isolated = second_area ? !!second_area.sound_isolated : FALSE
+	return from_isolated == to_isolated
 /datum/sound_template/proc/get_hearers()
 	var/list/hearers_to_return = list()
 	var/datum/shape/rectangle/zone = SQUARE(x, y, range * 2)
 	hearers_to_return += SSquadtree.players_in_range(zone, z)
 
-	var/turf/above = SSmapping.get_turf_above(locate(x, y, z))
-	while(above)
-		hearers_to_return += SSquadtree.players_in_range(zone, above.z)
-		above = SSmapping.get_turf_above(above)
+	var/turf/source_turf = locate(x, y, z)
+	if(source_turf)
+		var/area/current_area = get_area(source_turf)
 
-	var/turf/below = SSmapping.get_turf_below(locate(x, y, z))
-	while(below)
-		hearers_to_return += SSquadtree.players_in_range(zone, below.z)
-		below = SSmapping.get_turf_below(below)
+		var/turf/above = SSmapping.get_turf_above(source_turf)
+		while(above)
+			var/area/above_area = get_area(above)
+			if(!areas_can_share_sound(current_area, above_area))
+				break
+			hearers_to_return += SSquadtree.players_in_range(zone, above.z)
+			current_area = above_area
+			above = SSmapping.get_turf_above(above)
+
+		current_area = get_area(source_turf)
+		var/turf/below = SSmapping.get_turf_below(source_turf)
+		while(below)
+			var/area/below_area = get_area(below)
+			if(!areas_can_share_sound(current_area, below_area))
+				break
+			hearers_to_return += SSquadtree.players_in_range(zone, below.z)
+			current_area = below_area
+			below = SSmapping.get_turf_below(below)
 	return hearers_to_return
+
 
 /proc/get_free_channel()
 	var/static/cur_chan = 1
@@ -328,6 +347,8 @@
 				sound = pick('sound/weapons/gun_nsg23_1.ogg','sound/weapons/gun_nsg23_2.ogg')
 			if("gun_pkd")
 				sound = pick('sound/weapons/gun_pkd_fire01.ogg','sound/weapons/gun_pkd_fire02.ogg','sound/weapons/gun_pkd_fire03.ogg')
+			if("gun_l64")
+				sound = pick('sound/weapons/gun_l64_1.ogg','sound/weapons/gun_l64_2.ogg','sound/weapons/gun_l64_3.ogg')
 
 			// Xeno
 			if("acid_hit")
@@ -479,3 +500,5 @@
 
 	for(var/sound/soundin in SoundQuery())
 		UNLINT(to_chat(src, "channel#[soundin.channel]: [soundin.status] - [soundin.file] - len=[length(soundin)], wait=[soundin.wait], offset=[soundin.offset], repeat=[soundin.repeat]")) // unlint until spacemandmm suite-1.7
+
+
